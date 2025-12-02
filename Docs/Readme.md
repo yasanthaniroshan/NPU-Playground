@@ -13,6 +13,8 @@ This repository contains experiments and examples for working with NPU in Luckfo
 
 ## Introduction
 
+![Luckfox Pico Mini B](./../Assets/Luckfox_Pico_Mini_B.jpg)
+
 The NPU Playground is designed to help developers explore the capabilities of the Neural Processing Unit (NPU) on the Luckfox Pico Mini B. It guides users through setting up the environment, converting models to RKNN format, and running inference on the device.
 
 ## Setup Environment
