@@ -1,0 +1,5 @@
+*.o
+*.jpg
+*.jpeg
+*.png
+dataset/

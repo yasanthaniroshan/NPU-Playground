@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "format": "c",
+        "__locale": "c",
+        "ios": "c"
+    }
+}
