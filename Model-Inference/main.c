@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
     float static_input[HEIGHT * WIDTH];
     for (int row = 0; row < HEIGHT; row++) {
         for (int col = 0; col < WIDTH; col++) {
-            static_input[row * WIDTH + col] = (row == col) ? 255.0f : 128.0f;
+            static_input[row * WIDTH + col] = (row == col) ? 255.0f : 0.0f;
         }
     }
     // 1. Initialize RKNN context
@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
     printf("Raw -> Dequantized (first 20):\n");
     for (int i=0;i<40;i+=2){
         int8_t q = out[i];
-        float f = ((q - output_attrs[0].zp) * output_attrs[0].scale)/255;
+        float f = (q - output_attrs[0].zp) * output_attrs[0].scale;
         printf("%d -> %.6f\n", q, f);
     }
     // 6. Rescale INT8 output back to FP32 and save to file
@@ -164,7 +164,7 @@ int main(int argc, char** argv) {
         }
         for (int i = 0; i < output_attrs[0].n_elems; i++) {
             int8_t q = out_data_int8[i];
-            out_data_fp32[i] = ((q - output_attrs[0].zp) * output_attrs[0].scale)/255;
+            out_data_fp32[i] = (q - output_attrs[0].zp) * output_attrs[0].scale;
         }
     
         // Save to text file as a single line
