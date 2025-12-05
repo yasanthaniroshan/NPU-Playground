@@ -4,10 +4,15 @@
 #include <stdint.h>
 #include "rknn_api.h"
 
-#define BATCH 1
-#define CHANNEL 1
-#define HEIGHT 32
-#define WIDTH 32
+#define INPUT_LENGTH 2
+#define TEMP_MIN 26.7
+#define HUM_MIN 40.01
+#define TEMP_RANGE 13.3
+#define HUM_RANGE 59.97
+
+#define OUTPUT_MAX 105.72
+#define OUTPUT_MIN 26.79
+#define OUTPUT_RANGE 78.93
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -18,12 +23,12 @@ int main(int argc, char** argv) {
     const char* model_path = argv[1];
     rknn_context ctx;
     int ret;
-    float static_input[HEIGHT * WIDTH];
-    for (int row = 0; row < HEIGHT; row++) {
-        for (int col = 0; col < WIDTH; col++) {
-            static_input[row * WIDTH + col] = (row == col) ? 255.0f : 128.0f;
-        }
-    }
+    float static_input[INPUT_LENGTH];
+    
+    //Static input: temperature=25.0, humidity=50.0
+    static_input[0] = (29.0 - TEMP_MIN) / TEMP_RANGE;
+    static_input[1] = (50.0 - HUM_MIN) / HUM_RANGE;
+
     // 1. Initialize RKNN context
     ret = rknn_init(&ctx, (char*)model_path, 0, 0, NULL);
     if (ret < 0) {
@@ -64,31 +69,13 @@ int main(int argc, char** argv) {
             return -1;
         }
 
-
-        int number_of_negatives = 0;
-        int number_of_zeros = 0;
-        int number_of_positives = 0;
-
-        // Fill input with neutral INT8 values
+        // Fill input with quantized data
         int8_t* in_data = (int8_t*)input_mems[i]->virt_addr;
         for (int j = 0; j < input_attrs[i].n_elems; j++) {
-            in_data[j] = (int8_t)(static_input[j] + input_attrs[i].zp);
-            if(in_data[j] > 0) {
-                number_of_positives++;
-            }
-            else if(in_data[j] <  0) {
-                number_of_negatives++;
-            }
-            else {
-                number_of_zeros++;
-            }
+            in_data[j] = (int8_t)((static_input[j]/input_attrs[i].scale) + input_attrs[i].zp);
         }
 
-        printf("\n------ OUTPUT ATTRIBUTES ------\n");
-        printf("number_of_negatives = %d\n",number_of_negatives);
-        printf("number_of_zeros = %d\n",number_of_zeros);
-        printf("number_of_positives = %d\n",number_of_positives );
-
+        printf("Input data temp = %d  hum %d\n",in_data[0],in_data[1]);
 
         ret = rknn_set_io_mem(ctx, input_mems[i], &input_attrs[i]);
         if (ret < 0) {
@@ -136,26 +123,14 @@ int main(int argc, char** argv) {
         printf("Inference run successfully!\n");
     }
 
-    // print first 40 raw int8 values (stepping by 2)
-    int8_t* out = (int8_t*)output_mems[0]->virt_addr;
-    printf("First 40 raw int8 (NC1HWC2, take every 2nd byte):\n");
-    for (int i = 0; i < 40; i += 2) {
-        printf("%d ", out[i]);
-    }
+
     printf("\nScale=%f zp=%d n_elems=%d\n",
         output_attrs[0].scale, output_attrs[0].zp, output_attrs[0].n_elems);
 
-    printf("Raw -> Dequantized (first 20):\n");
-    for (int i=0;i<40;i+=2){
-        int8_t q = out[i];
-        float f = ((q - output_attrs[0].zp) * output_attrs[0].scale)/255;
-        printf("%d -> %.6f\n", q, f);
-    }
     // 6. Rescale INT8 output back to FP32 and save to file
     if (io_num.n_output > 0) {
         int8_t* out_data_int8 = (int8_t*)output_mems[0]->virt_addr;
         float* out_data_fp32 = (float*)malloc(output_attrs[0].n_elems * sizeof(float));
-        int idx = 0;
 
         if (!out_data_fp32) {
             printf("Failed to allocate memory for FP32 output\n");
@@ -164,9 +139,11 @@ int main(int argc, char** argv) {
         }
         for (int i = 0; i < output_attrs[0].n_elems; i++) {
             int8_t q = out_data_int8[i];
-            out_data_fp32[i] = ((q - output_attrs[0].zp) * output_attrs[0].scale)/255;
+            printf("Output Data h_index %d\n",q);
+            out_data_fp32[i] = ((q - output_attrs[0].zp) * output_attrs[0].scale);
         }
     
+        out_data_fp32[0] = out_data_fp32[0] * OUTPUT_RANGE + OUTPUT_MIN;
         // Save to text file as a single line
         FILE* f = fopen("output.txt", "w");
         if (!f) {
@@ -199,14 +176,6 @@ int main(int argc, char** argv) {
     printf("scale       = %f\n", input_attrs[0].scale);
     printf("zero point  = %d\n", input_attrs[0].zp);
     printf("--------------------------------\n");
-
-
-
-    printf("\n---- Output tensor info ----\n");
-    printf("scale = %f\n", output_attrs[0].scale);
-    printf("zero point = %d\n", output_attrs[0].zp);
-    printf("qnt_type = %d\n", output_attrs[0].qnt_type);
-    printf("fl = %d\n", output_attrs[0].fl);
 
 
     // 7. Release resources
