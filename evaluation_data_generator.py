@@ -6,6 +6,6 @@ humidity    = np.round(np.random.uniform(40, 100, num_samples), 2)
 
 data = np.column_stack((temperature, humidity))
 
-np.savetxt("sensor_input.txt", data, fmt="%.2f")
+np.savetxt("input.txt", data, fmt="%.2f")
 
-print("✅ sensor_input.txt created")
+print("✅ input.txt created")
